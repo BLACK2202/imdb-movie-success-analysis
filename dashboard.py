@@ -124,6 +124,15 @@ with st.sidebar:
     - Genre analysis
     """)
 
+# Metric cards (already defined in CSS)
+def create_stat_summary(df, col):
+    """Calculate advanced stats"""
+    mean_val = df[col].mean()
+    median_val = df[col].median()
+    skew_val = df[col].skew()
+    kurtosis_val = df[col].kurtosis()
+    return f"**Mean:** {mean_val:.2f} | **Median:** {median_val:.2f} | **Skewness:** {skew_val:.2f} | **Kurtosis:** {kurtosis_val:.2f}"
+
 # Cache data loading for performance
 @st.cache_data
 def load_data():
@@ -133,11 +142,12 @@ def load_data():
         chunks = []
         
         try:
+            # We add runtimeMinutes for extra analysis
             cols_to_use = ['tconst', 'titleType', 'startYear', 'genres', 'primaryTitle']
             chunk_iterator = pd.read_csv(
                 "title.basics.tsv", 
                 sep="\t", 
-                chunksize=50000, 
+                chunksize=100000, 
                 usecols=cols_to_use, 
                 encoding='utf-8', 
                 on_bad_lines='skip'
@@ -152,6 +162,10 @@ def load_data():
             ratings = pd.read_csv("title.ratings.tsv", sep="\t", low_memory=False)
             df = pd.merge(basics, ratings, on='tconst')
             
+            # Feature Engineering: Success Index (balancing rating and volume)
+            # Use log10 to handle huge discrepancy between 100 votes and 2M votes
+            df['success_score'] = df['averageRating'] * np.log10(df['numVotes'] + 1)
+            
             return df
         except FileNotFoundError:
             st.error("⚠️ Data files not found! Please ensure 'title.basics.tsv' and 'title.ratings.tsv' are in the working directory.")
@@ -164,6 +178,11 @@ def load_data():
 df = load_data()
 
 if df is not None:
+    # Sidebar Filters
+    with st.sidebar:
+        st.markdown("### Search & Highlight")
+        search_title = st.text_input("Find a specific movie:", placeholder="e.g. The Shawshank Redemption")
+        
     # Apply filters
     filtered_df = df[
         (df['startYear'] >= year_min) & 
@@ -175,401 +194,209 @@ if df is not None:
     # Key Metrics Section
     st.header("📈 Key Metrics")
     
-    # Calculate metrics
     total_titles = len(filtered_df)
     avg_rating = filtered_df['averageRating'].mean()
-    median_rating = filtered_df['averageRating'].median()
+    avg_success = filtered_df['success_score'].mean()
     total_votes = filtered_df['numVotes'].sum()
     content_types = filtered_df['titleType'].nunique()
     
-    # Create custom metric cards with colors
     col1, col2, col3, col4, col5 = st.columns(5)
     
     with col1:
-        st.markdown(f"""
-            <div class="metric-card metric-card-blue">
-                <div class="metric-icon">🎬</div>
-                <div class="metric-label">Total Titles</div>
-                <div class="metric-value">{total_titles:,}</div>
-            </div>
-        """, unsafe_allow_html=True)
-    
+        st.markdown(f'<div class="metric-card metric-card-blue"><div class="metric-icon">🎬</div><div class="metric-label">Titles</div><div class="metric-value">{total_titles:,}</div></div>', unsafe_allow_html=True)
     with col2:
-        st.markdown(f"""
-            <div class="metric-card metric-card-green">
-                <div class="metric-icon">⭐</div>
-                <div class="metric-label">Average Rating</div>
-                <div class="metric-value">{avg_rating:.2f}</div>
-            </div>
-        """, unsafe_allow_html=True)
-    
+        st.markdown(f'<div class="metric-card metric-card-green"><div class="metric-icon">⭐</div><div class="metric-label">Avg Rating</div><div class="metric-value">{avg_rating:.2f}</div></div>', unsafe_allow_html=True)
     with col3:
-        st.markdown(f"""
-            <div class="metric-card metric-card-orange">
-                <div class="metric-icon">📊</div>
-                <div class="metric-label">Median Rating</div>
-                <div class="metric-value">{median_rating:.2f}</div>
-            </div>
-        """, unsafe_allow_html=True)
-    
+        st.markdown(f'<div class="metric-card metric-card-orange"><div class="metric-icon">🚀</div><div class="metric-label">Success Index</div><div class="metric-value">{avg_success:.2f}</div></div>', unsafe_allow_html=True)
     with col4:
-        st.markdown(f"""
-            <div class="metric-card metric-card-purple">
-                <div class="metric-icon">👥</div>
-                <div class="metric-label">Total Votes</div>
-                <div class="metric-value">{total_votes:,.0f}</div>
-            </div>
-        """, unsafe_allow_html=True)
-    
+        st.markdown(f'<div class="metric-card metric-card-purple"><div class="metric-icon">👥</div><div class="metric-label">Total Votes</div><div class="metric-value">{total_votes:,.0f}</div></div>', unsafe_allow_html=True)
     with col5:
-        st.markdown(f"""
-            <div class="metric-card metric-card-red">
-                <div class="metric-icon">🎭</div>
-                <div class="metric-label">Content Types</div>
-                <div class="metric-value">{content_types}</div>
-            </div>
-        """, unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-card metric-card-red"><div class="metric-icon">🎭</div><div class="metric-label">Formats</div><div class="metric-value">{content_types}</div></div>', unsafe_allow_html=True)
     
     st.markdown("---")
     
-    # Create tabs for different sections
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
-        "📊 Overview", 
-        "🎭 Content Types", 
-        "⭐ Popularity vs Quality",
-        "📅 Temporal Trends",
-        "🎪 Genre Analysis",
-        "📋 Data Explorer"
+    # Create tabs
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+        "📊 Distribution", 
+        "🎭 Content Review", 
+        "⭐ Success Analysis",
+        "🔗 Pairwise Insight",
+        "📅 Time Machine",
+        "🎪 Genre Spotlight",
+        "📋 Raw Data"
     ])
     
     # Tab 1: Overview - Rating Distribution
     with tab1:
-        st.header("Rating Distribution")
-        st.markdown("How are ratings spread across all titles?")
+        st.header("How are ratings spread?")
+        st.markdown(create_stat_summary(filtered_df, 'averageRating'))
         
-        col1, col2 = st.columns([2, 1])
+        # Enhanced Histogram with Marginal Plots
+        fig = px.histogram(
+            filtered_df, 
+            x='averageRating', 
+            nbins=40,
+            marginal="box", # Add a box plot on top
+            title='IMDb Rating Distribution',
+            labels={'averageRating': 'Average Rating'},
+            color_discrete_sequence=['#764ba2']
+        )
+        # Add Mean and Median lines
+        fig.add_vline(x=avg_rating, line_dash="dash", line_color="green", annotation_text=f"Mean: {avg_rating:.2f}")
+        fig.add_vline(x=filtered_df['averageRating'].median(), line_dash="dot", line_color="orange", annotation_text=f"Med: {filtered_df['averageRating'].median():.2f}")
         
-        with col1:
-            # Histogram with Plotly
-            fig = px.histogram(
-                filtered_df, 
-                x='averageRating', 
-                nbins=30,
-                title='Distribution of IMDb Ratings',
-                labels={'averageRating': 'Average Rating', 'count': 'Number of Titles'},
-                color_discrete_sequence=['#636EFA']
-            )
-            fig.update_layout(
-                showlegend=False,
-                height=500,
-                xaxis_title="Average Rating",
-                yaxis_title="Count"
-            )
-            st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True)
         
-        with col2:
-            st.subheader("Statistics")
-            st.write(f"**Mean:** {filtered_df['averageRating'].mean():.2f}")
-            st.write(f"**Median:** {filtered_df['averageRating'].median():.2f}")
-            st.write(f"**Mode:** {filtered_df['averageRating'].mode()[0]:.2f}")
-            st.write(f"**Std Dev:** {filtered_df['averageRating'].std():.2f}")
-            st.write(f"**Min:** {filtered_df['averageRating'].min():.2f}")
-            st.write(f"**Max:** {filtered_df['averageRating'].max():.2f}")
-            
-            st.subheader("Percentiles")
-            st.write(f"**25th:** {filtered_df['averageRating'].quantile(0.25):.2f}")
-            st.write(f"**50th:** {filtered_df['averageRating'].quantile(0.50):.2f}")
-            st.write(f"**75th:** {filtered_df['averageRating'].quantile(0.75):.2f}")
-            st.write(f"**90th:** {filtered_df['averageRating'].quantile(0.90):.2f}")
+        with st.expander("🎓 Statistical Note: Is it a Bell Curve?"):
+            st.write("""
+            IMDb ratings are typically **negatively skewed** (right-leaning), meaning most users are helpful and rate above 6.0. 
+            A high **Kurtosis** indicates that ratings are tightly packed around the median, with few extremely 'bad' movies becoming viral.
+            """)
     
     # Tab 2: Content Type Analysis
     with tab2:
-        st.header("Rating Distribution by Content Type")
-        st.markdown("Which format tends to get higher ratings: Movies, TV Series, or others?")
-        
+        st.header("Format Performance")
         col1, col2 = st.columns([2, 1])
         
         with col1:
-            # Box plot
-            fig = px.box(
-                filtered_df, 
-                x='titleType', 
-                y='averageRating',
-                title='Rating Distribution by Content Type',
-                labels={'titleType': 'Content Type', 'averageRating': 'Average Rating'},
-                color='titleType'
-            )
-            fig.update_layout(height=500, showlegend=False)
-            fig.update_xaxes(tickangle=45)
+            fig = px.box(filtered_df, x='titleType', y='averageRating', color='titleType', title='Content Type Quality Range')
             st.plotly_chart(fig, use_container_width=True)
         
         with col2:
-            st.subheader("Content Type Breakdown")
-            type_stats = filtered_df.groupby('titleType').agg({
-                'averageRating': 'mean',
-                'numVotes': 'sum',
-                'tconst': 'count'
-            }).round(2)
-            type_stats.columns = ['Avg Rating', 'Total Votes', 'Count']
-            type_stats = type_stats.sort_values('Avg Rating', ascending=False)
-            st.dataframe(type_stats, use_container_width=True)
-            
-            # Pie chart of content types
-            fig_pie = px.pie(
-                filtered_df, 
-                names='titleType',
-                title='Distribution of Content Types',
-                hole=0.4
-            )
-            fig_pie.update_layout(height=300)
-            st.plotly_chart(fig_pie, use_container_width=True)
-    
-    # Tab 3: Popularity vs Quality
+            st.subheader("Leaderboard")
+            st.dataframe(filtered_df.groupby('titleType')['averageRating'].mean().sort_values(ascending=False), use_container_width=True)
+
+    # Tab 3: Success Analysis (New scientific focus)
     with tab3:
-        st.header("Popularity vs. Quality Analysis")
-        st.markdown("Do popular titles (more votes) always have higher ratings?")
+        st.header("Quality vs. Popularity")
         
         # Sample for performance
-        sample_size = min(10000, len(filtered_df))
+        sample_size = min(15000, len(filtered_df))
         sample_df = filtered_df.sample(n=sample_size, random_state=42)
         
-        # Scatter plot with log scale
+        # Scatter with Search Highlighting
+        sample_df['is_highlight'] = 'Normal'
+        if search_title:
+            sample_df.loc[sample_df['primaryTitle'].str.contains(search_title, case=False, na=False), 'is_highlight'] = 'Highlighted'
+        
         fig = px.scatter(
-            sample_df,
-            x='numVotes',
-            y='averageRating',
-            color='titleType',
-            title=f'Popularity (Votes) vs. Quality (Rating) - Sample of {sample_size:,} titles',
-            labels={'numVotes': 'Number of Votes (Log Scale)', 'averageRating': 'Average Rating'},
-            hover_data=['primaryTitle'],
-            opacity=0.6
+            sample_df, x='numVotes', y='averageRating', 
+            color='is_highlight', size='success_score', 
+            hover_data=['primaryTitle', 'startYear'],
+            log_x=True, title=f"Success Quadrant (Sample: {sample_size:,} entries)",
+            color_discrete_map={'Normal': 'rgba(100, 100, 100, 0.4)', 'Highlighted': '#f5576c'}
         )
-        fig.update_xaxes(type="log")
-        fig.update_layout(height=600)
         st.plotly_chart(fig, use_container_width=True)
         
-        # Correlation analysis
-        st.subheader("Correlation Analysis")
-        correlation = filtered_df[['numVotes', 'averageRating']].corr().iloc[0, 1]
-        st.write(f"**Correlation between Votes and Rating:** {correlation:.3f}")
+        # Correlation Analysis
+        corr = filtered_df[['numVotes', 'averageRating']].corr().iloc[0, 1]
+        st.metric("Pearson Correlation Coefficient", f"{corr:.3f}")
         
-        if correlation > 0.3:
-            st.success("✅ Positive correlation: More popular titles tend to have higher ratings")
-        elif correlation < -0.3:
-            st.error("❌ Negative correlation: More popular titles tend to have lower ratings")
-        else:
-            st.info("ℹ️ Weak correlation: Popularity and quality are relatively independent")
-        
-        # Top voted titles
-        col1, col2 = st.columns(2)
-        with col1:
-            st.subheader("🔥 Most Popular Titles")
-            top_voted = filtered_df.nlargest(10, 'numVotes')[['primaryTitle', 'averageRating', 'numVotes', 'titleType']]
-            st.dataframe(top_voted, use_container_width=True)
-        
-        with col2:
-            st.subheader("⭐ Highest Rated Titles (min 1000 votes)")
-            top_rated = filtered_df[filtered_df['numVotes'] >= 1000].nlargest(10, 'averageRating')[
-                ['primaryTitle', 'averageRating', 'numVotes', 'titleType']
-            ]
-            st.dataframe(top_rated, use_container_width=True)
-    
-    # Tab 4: Temporal Trends
+        st.info(f"**Interpretation:** A correlation of {corr:.3f} suggests that popularity and quality are {'strongly' if abs(corr)>0.5 else 'moderately' if abs(corr)>0.3 else 'weakly'} linked.")
+
+        colA, colB = st.columns(2)
+        with colA:
+            st.subheader("🏆 The 'Ultimate' Winners (Success Index)")
+            st.write("*Highest calculated Rating × log(Votes)*")
+            top_success = filtered_df.nlargest(10, 'success_score')[['primaryTitle', 'averageRating', 'numVotes', 'success_score']]
+            st.dataframe(top_success, use_container_width=True)
+        with colB:
+            st.subheader("💎 Hidden Gems")
+            st.write("*High Rating but fewer than 5,000 votes*")
+            gems = filtered_df[(filtered_df['averageRating'] >= 8.5) & (filtered_df['numVotes'] < 5000)].sort_values('averageRating', ascending=False)
+            st.dataframe(gems[['primaryTitle', 'averageRating', 'numVotes']].head(10), use_container_width=True)
+
+    # New Tab 4: Pairwise Insights (The Interactive 'Pair Plot')
     with tab4:
-        st.header("Success Over Time")
-        st.markdown("How have ratings and production output changed over the years?")
+        st.header("🔗 Multi-Dimensional Relationships")
+        st.markdown("""
+        Below is an interactive **Scatter Matrix** (interactive Pair Plot). 
+        You can see how Year, Rating, and Votes interlink.
+        - **Diagonal**: Distributions.
+        - **Others**: Pairwise correlations.
+        """)
         
-        # Filter valid years
-        year_df = filtered_df[
-            (filtered_df['startYear'] >= 1920) & 
-            (filtered_df['startYear'] <= 2025)
-        ].copy()
+        # Use a smaller sample for the matrix for performance
+        matrix_sample = filtered_df.sample(n=min(2000, len(filtered_df)), random_state=42)
         
-        # Calculate yearly statistics
-        yearly_stats = year_df.groupby('startYear').agg({
-            'averageRating': 'mean',
-            'tconst': 'count',
-            'numVotes': 'sum'
-        }).reset_index()
-        yearly_stats.columns = ['Year', 'Avg Rating', 'Title Count', 'Total Votes']
-        
-        # Line chart for ratings over time
-        fig = make_subplots(
-            rows=2, cols=1,
-            subplot_titles=('Average Rating Over Time', 'Number of Titles Released Per Year'),
-            vertical_spacing=0.15
+        fig_matrix = px.scatter_matrix(
+            matrix_sample,
+            dimensions=['startYear', 'averageRating', 'numVotes', 'success_score'],
+            color='titleType',
+            title="Interactive Pair Plots (Sample: 2,000 points)",
+            hover_data=['primaryTitle'],
+            opacity=0.4
         )
+        fig_matrix.update_layout(height=800)
+        # Use log scale for numVotes in the matrix if possible for better visibility
+        st.plotly_chart(fig_matrix, use_container_width=True)
         
-        # Rating trend
-        fig.add_trace(
-            go.Scatter(
-                x=yearly_stats['Year'], 
-                y=yearly_stats['Avg Rating'],
-                mode='lines+markers',
-                name='Average Rating',
-                line=dict(color='purple', width=2),
-                marker=dict(size=4)
-            ),
-            row=1, col=1
-        )
-        
-        # Title count trend
-        fig.add_trace(
-            go.Scatter(
-                x=yearly_stats['Year'], 
-                y=yearly_stats['Title Count'],
-                mode='lines',
-                name='Title Count',
-                line=dict(color='orange', width=2),
-                fill='tozeroy'
-            ),
-            row=2, col=1
-        )
-        
-        fig.update_xaxes(title_text="Year", row=2, col=1)
-        fig.update_yaxes(title_text="Average Rating", row=1, col=1)
-        fig.update_yaxes(title_text="Number of Titles", row=2, col=1)
-        fig.update_layout(height=800, showlegend=False)
-        
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # Decade analysis
-        st.subheader("📊 Analysis by Decade")
-        year_df['decade'] = (year_df['startYear'] // 10) * 10
-        decade_stats = year_df.groupby('decade').agg({
-            'averageRating': 'mean',
-            'tconst': 'count',
-            'numVotes': 'mean'
-        }).round(2)
-        decade_stats.columns = ['Avg Rating', 'Title Count', 'Avg Votes']
-        st.dataframe(decade_stats, use_container_width=True)
-    
-    # Tab 5: Genre Analysis
+        st.info("💡 Hint: Select a Content Type in the legend to filter the matrix view!")
+
+    # Tab 5: Temporal Trends
     with tab5:
-        st.header("Genre Performance Analysis")
-        st.markdown("Which genres have the highest average ratings?")
+        st.header("The Evolution of IMDb")
+        yearly = filtered_df.groupby('startYear').agg({'averageRating': 'mean', 'tconst': 'count'}).reset_index()
         
-        # Process genres
+        fig = make_subplots(specs=[[{"secondary_y": True}]])
+        fig.add_trace(go.Scatter(x=yearly['startYear'], y=yearly['averageRating'], name="Avg Rating"), secondary_y=False)
+        fig.add_trace(go.Bar(x=yearly['startYear'], y=yearly['tconst'], name="Title Volume", opacity=0.3), secondary_y=True)
+        
+        fig.update_layout(title="Volume vs Quality Over Time", hovermode="x unified")
+        st.plotly_chart(fig, use_container_width=True)
+
+    # Tab 6: Genre Analysis
+    with tab6:
+        st.header("The Best & Worst Genres")
+        
+        # Explode genres
         genre_df = filtered_df.dropna(subset=['genres']).copy()
         genre_df['genres'] = genre_df['genres'].str.split(',')
         genre_exploded = genre_df.explode('genres')
         
-        # Calculate genre statistics
-        genre_stats = genre_exploded.groupby('genres').agg(
-            avg_rating=('averageRating', 'mean'),
-            count=('tconst', 'count'),
-            total_votes=('numVotes', 'sum'),
-            avg_votes=('numVotes', 'mean')
-        ).reset_index()
+        g_stats = genre_exploded.groupby('genres').agg({
+            'averageRating': 'mean',
+            'tconst': 'count',
+            'success_score': 'mean'
+        }).reset_index()
         
-        # Filter for statistical significance
-        min_titles = st.slider("Minimum titles per genre", 10, 1000, 100)
-        genre_stats = genre_stats[genre_stats['count'] >= min_titles].sort_values('avg_rating', ascending=False)
+        # Min titles filter
+        min_p = st.selectbox("Frequency Threshold", options=[10, 50, 100, 500, 1000], index=2)
+        g_stats = g_stats[g_stats['tconst'] >= min_p].sort_values('success_score', ascending=False)
         
-        col1, col2 = st.columns([2, 1])
-        
-        with col1:
-            # Top genres bar chart
-            top_n = st.slider("Number of top genres to display", 5, 30, 20)
-            fig = px.bar(
-                genre_stats.head(top_n),
-                x='avg_rating',
-                y='genres',
-                orientation='h',
-                title=f'Top {top_n} Genres by Average Rating (min. {min_titles} titles)',
-                labels={'avg_rating': 'Average Rating', 'genres': 'Genre'},
-                color='avg_rating',
-                color_continuous_scale='viridis'
-            )
-            fig.update_layout(height=600, showlegend=False)
-            st.plotly_chart(fig, use_container_width=True)
-        
-        with col2:
-            st.subheader("📊 Genre Statistics")
-            display_stats = genre_stats.head(10)[['genres', 'avg_rating', 'count', 'avg_votes']].round(2)
-            display_stats.columns = ['Genre', 'Avg Rating', 'Count', 'Avg Votes']
-            st.dataframe(display_stats, use_container_width=True)
-            
-            # Most popular genres
-            st.subheader("🔥 Most Produced Genres")
-            top_genres = genre_stats.nlargest(10, 'count')[['genres', 'count', 'avg_rating']].round(2)
-            top_genres.columns = ['Genre', 'Count', 'Avg Rating']
-            st.dataframe(top_genres, use_container_width=True)
-        
-        # Genre comparison
-        st.subheader("🎭 Genre Comparison Matrix")
-        selected_genres = st.multiselect(
-            "Select genres to compare",
-            options=genre_stats['genres'].tolist(),
-            default=genre_stats.head(5)['genres'].tolist()
-        )
-        
-        if selected_genres:
-            comparison_data = genre_stats[genre_stats['genres'].isin(selected_genres)]
-            
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(
-                x=comparison_data['count'],
-                y=comparison_data['avg_rating'],
-                mode='markers+text',
-                text=comparison_data['genres'],
-                textposition="top center",
-                marker=dict(
-                    size=comparison_data['total_votes'] / comparison_data['total_votes'].max() * 100,
-                    color=comparison_data['avg_rating'],
-                    colorscale='viridis',
-                    showscale=True,
-                    colorbar=dict(title="Avg Rating")
-                )
-            ))
-            fig.update_layout(
-                title="Genre Comparison: Count vs Rating (bubble size = total votes)",
-                xaxis_title="Number of Titles",
-                yaxis_title="Average Rating",
-                height=500
-            )
-            st.plotly_chart(fig, use_container_width=True)
-    
-    # Tab 6: Data Explorer
-    with tab6:
-        st.header("📋 Data Explorer")
-        st.markdown("Explore the raw data with interactive filtering")
-        
-        # Display options
         col1, col2 = st.columns(2)
         with col1:
-            show_rows = st.number_input("Number of rows to display", 10, 1000, 100)
+            fig_success = px.bar(g_stats.head(20), x='success_score', y='genres', orientation='h', 
+                                color='averageRating',
+                                title="Top 20 Genres by Success Index", 
+                                labels={'success_score': 'Scientific Success Index'})
+            st.plotly_chart(fig_success, use_container_width=True)
+            
         with col2:
-            sort_by = st.selectbox("Sort by", ['averageRating', 'numVotes', 'startYear', 'primaryTitle'])
-        
-        sort_order = st.radio("Sort order", ['Descending', 'Ascending'], horizontal=True)
-        ascending = (sort_order == 'Ascending')
-        
-        # Display data
-        display_df = filtered_df.sort_values(sort_by, ascending=ascending).head(show_rows)
-        st.dataframe(display_df, use_container_width=True, height=600)
-        
-        # Download option
-        st.download_button(
-            label="📥 Download Filtered Data as CSV",
-            data=filtered_df.to_csv(index=False).encode('utf-8'),
-            file_name='imdb_filtered_data.csv',
-            mime='text/csv',
-        )
-        
-        # Data summary
-        st.subheader("📊 Data Summary")
-        st.write(filtered_df.describe())
+            vol_stats = g_stats.sort_values('tconst', ascending=False).head(20)
+            fig_vol = px.bar(vol_stats, x='tconst', y='genres', orientation='h', 
+                            color='tconst',
+                            title="Top 20 Genres by Title Volume", 
+                            labels={'tconst': 'Number of Titles'})
+            st.plotly_chart(fig_vol, use_container_width=True)
+            
+        with st.expander("📚 What is the 'Success Index'?"):
+            st.write("""
+            Success isn't just a high rating. A movie with 10.0 from 5 friends is less 'successful' than a 9.0 from 2 million voters. 
+            The **Success Index** is calculated as:  
+            `Rating * log10(Votes + 1)`  
+            This balances the quality (Rating) with the cultural impact (Votes).
+            """)
+
+    # Tab 7: Data Explorer
+    with tab7:
+        st.header("Search Data")
+        st.dataframe(filtered_df.sort_values('success_score', ascending=False).head(100), use_container_width=True)
+        st.download_button("📥 Download Filtered TSV", filtered_df.to_csv(sep='\t', index=False).encode('utf-8'), "imdb_analysis.tsv", "text/tab-separated-values")
 
 else:
-    st.error("Failed to load data. Please check if the data files are available.")
-    st.info("Required files: title.basics.tsv and title.ratings.tsv")
+    st.error("Data Load Failed.")
 
 # Footer
 st.markdown("---")
-st.markdown("""
-    <div style='text-align: center'>
-        <p>🎬 IMDb Movie Success Analysis Dashboard | Built with Streamlit</p>
-        <p>Data source: IMDb Non-Commercial Datasets</p>
-    </div>
-    """, unsafe_allow_html=True)
+st.markdown("<div style='text-align: center; opacity: 0.5;'>IMDb Success Dashboard v2.0 | Advanced Analytics Mode</div>", unsafe_allow_html=True)
