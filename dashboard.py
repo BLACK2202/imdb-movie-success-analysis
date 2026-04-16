@@ -133,6 +133,30 @@ def create_stat_summary(df, col):
     kurtosis_val = df[col].kurtosis()
     return f"**Mean:** {mean_val:.2f} | **Median:** {median_val:.2f} | **Skewness:** {skew_val:.2f} | **Kurtosis:** {kurtosis_val:.2f}"
 
+
+def prepare_live_rows(new_df):
+    """Validate and normalize newly uploaded/appended rows."""
+    required_cols = ['tconst', 'titleType', 'startYear', 'genres', 'primaryTitle', 'averageRating', 'numVotes']
+    missing_cols = [col for col in required_cols if col not in new_df.columns]
+
+    if missing_cols:
+        raise ValueError(f"Missing required columns: {', '.join(missing_cols)}")
+
+    live_df = new_df[required_cols].copy()
+    live_df['tconst'] = live_df['tconst'].astype(str).str.strip()
+    live_df['titleType'] = live_df['titleType'].astype(str).str.strip()
+    live_df['primaryTitle'] = live_df['primaryTitle'].astype(str).str.strip()
+    live_df['genres'] = live_df['genres'].fillna('Unknown').astype(str)
+    live_df['startYear'] = pd.to_numeric(live_df['startYear'], errors='coerce')
+    live_df['averageRating'] = pd.to_numeric(live_df['averageRating'], errors='coerce')
+    live_df['numVotes'] = pd.to_numeric(live_df['numVotes'], errors='coerce')
+
+    live_df = live_df.dropna(subset=['tconst', 'titleType', 'primaryTitle', 'startYear', 'averageRating', 'numVotes'])
+    live_df = live_df[live_df['numVotes'] >= 0]
+    live_df['success_score'] = live_df['averageRating'] * np.log10(live_df['numVotes'] + 1)
+
+    return live_df
+
 # Cache data loading for performance
 @st.cache_data
 def load_data():
@@ -178,10 +202,104 @@ def load_data():
 df = load_data()
 
 if df is not None:
+    if 'live_rows' not in st.session_state:
+        st.session_state.live_rows = pd.DataFrame(
+            columns=['tconst', 'titleType', 'startYear', 'genres', 'primaryTitle', 'averageRating', 'numVotes', 'success_score']
+        )
+
     # Sidebar Filters
     with st.sidebar:
         st.markdown("### Search & Highlight")
         search_title = st.text_input("Find a specific movie:", placeholder="e.g. The Shawshank Redemption")
+
+        st.markdown("---")
+        st.markdown("### Live Data Ingestion")
+        uploaded_file = st.file_uploader(
+            "Upload new rows (CSV or TSV)",
+            type=["csv", "tsv", "txt"],
+            help="Required columns: tconst, titleType, startYear, genres, primaryTitle, averageRating, numVotes"
+        )
+
+        if uploaded_file is not None:
+            try:
+                separator = "\t" if uploaded_file.name.lower().endswith((".tsv", ".txt")) else ","
+                incoming_df = pd.read_csv(uploaded_file, sep=separator)
+                st.caption(f"Detected {len(incoming_df):,} rows in upload")
+                st.dataframe(incoming_df.head(3), use_container_width=True)
+
+                if st.button("Add Uploaded Rows", use_container_width=True):
+                    prepared_rows = prepare_live_rows(incoming_df)
+                    existing_ids = set(df['tconst'].astype(str))
+                    if not st.session_state.live_rows.empty:
+                        existing_ids |= set(st.session_state.live_rows['tconst'].astype(str))
+
+                    prepared_rows = prepared_rows[~prepared_rows['tconst'].astype(str).isin(existing_ids)]
+
+                    if prepared_rows.empty:
+                        st.warning("No new unique rows were added.")
+                    else:
+                        st.session_state.live_rows = pd.concat(
+                            [st.session_state.live_rows, prepared_rows],
+                            ignore_index=True
+                        )
+                        st.success(f"Added {len(prepared_rows):,} new rows to the live dashboard.")
+                        st.rerun()
+            except Exception as exc:
+                st.error(f"Upload could not be processed: {exc}")
+
+        with st.expander("Add One Title Manually"):
+            with st.form("manual_live_row", clear_on_submit=True):
+                m_tconst = st.text_input("tconst", value="tt_new_001")
+                m_primary = st.text_input("primaryTitle", value="New Title")
+                m_type = st.selectbox("titleType", ['movie', 'tvSeries', 'tvMiniSeries', 'tvMovie', 'tvSpecial', 'video'])
+                m_year = st.number_input("startYear", min_value=1900, max_value=2035, value=2025)
+                m_genres = st.text_input("genres", value="Drama")
+                m_rating = st.slider("averageRating", min_value=0.0, max_value=10.0, value=7.0, step=0.1)
+                m_votes = st.number_input("numVotes", min_value=0, value=100)
+                add_manual = st.form_submit_button("Add Manual Row")
+
+            if add_manual:
+                try:
+                    manual_df = pd.DataFrame([
+                        {
+                            'tconst': m_tconst,
+                            'titleType': m_type,
+                            'startYear': m_year,
+                            'genres': m_genres,
+                            'primaryTitle': m_primary,
+                            'averageRating': m_rating,
+                            'numVotes': m_votes,
+                        }
+                    ])
+                    prepared_manual = prepare_live_rows(manual_df)
+                    existing_ids = set(df['tconst'].astype(str))
+                    if not st.session_state.live_rows.empty:
+                        existing_ids |= set(st.session_state.live_rows['tconst'].astype(str))
+
+                    prepared_manual = prepared_manual[~prepared_manual['tconst'].astype(str).isin(existing_ids)]
+
+                    if prepared_manual.empty:
+                        st.warning("This tconst already exists or the row is invalid.")
+                    else:
+                        st.session_state.live_rows = pd.concat(
+                            [st.session_state.live_rows, prepared_manual],
+                            ignore_index=True
+                        )
+                        st.success("Manual row added to the live dashboard.")
+                        st.rerun()
+                except Exception as exc:
+                    st.error(f"Manual row could not be added: {exc}")
+
+        if not st.session_state.live_rows.empty:
+            st.info(f"Live rows currently active: {len(st.session_state.live_rows):,}")
+            if st.button("Clear Live Rows", use_container_width=True):
+                st.session_state.live_rows = pd.DataFrame(
+                    columns=['tconst', 'titleType', 'startYear', 'genres', 'primaryTitle', 'averageRating', 'numVotes', 'success_score']
+                )
+                st.rerun()
+
+    if not st.session_state.live_rows.empty:
+        df = pd.concat([df, st.session_state.live_rows], ignore_index=True)
         
     # Apply filters
     filtered_df = df[
