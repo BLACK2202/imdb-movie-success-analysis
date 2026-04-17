@@ -1,0 +1,214 @@
+.stApp {
+    background:
+        radial-gradient(circle at top left, rgba(255, 163, 26, 0.16), transparent 24%),
+        radial-gradient(circle at top right, rgba(0, 209, 178, 0.14), transparent 28%),
+        linear-gradient(180deg, #07111f 0%, #0b1526 52%, #111d33 100%);
+    color: #e5edf7;
+}
+
+.block-container {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+    max-width: 1300px;
+}
+
+h1, h2, h3 {
+    color: #f8fafc;
+    letter-spacing: -0.02em;
+}
+
+[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, rgba(7, 17, 31, 0.96), rgba(12, 24, 43, 0.98));
+    border-right: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+[data-testid="stHeader"] {
+    background: rgba(7, 17, 31, 0.75);
+}
+
+[data-testid="stMarkdownContainer"],
+label,
+.stSelectbox label,
+.stMultiSelect label,
+.stSlider label,
+.stNumberInput label,
+.stTextInput label,
+.stRadio label,
+.stCaption,
+p,
+span,
+div {
+    color: #e5edf7;
+}
+
+.hero-panel {
+    padding: 1.6rem 1.8rem;
+    border-radius: 24px;
+    background: linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(30, 41, 59, 0.94));
+    color: #f8fbff;
+    box-shadow: 0 20px 35px rgba(2, 6, 23, 0.36);
+    border: 1px solid rgba(148, 163, 184, 0.12);
+    margin-bottom: 1rem;
+}
+
+.hero-title {
+    font-size: 2.2rem;
+    font-weight: 700;
+    margin-bottom: 0.3rem;
+}
+
+.hero-subtitle {
+    font-size: 1rem;
+    line-height: 1.6;
+    color: rgba(226, 232, 240, 0.88);
+}
+
+.kpi-card {
+    border-radius: 22px;
+    padding: 1rem 1.2rem;
+    color: #f8fafc;
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.9));
+    border: 1px solid rgba(148, 163, 184, 0.14);
+    box-shadow: 0 14px 25px rgba(2, 6, 23, 0.22);
+    min-height: 120px;
+}
+
+.kpi-label {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.78rem;
+    color: #93c5fd;
+}
+
+.kpi-value {
+    font-size: 1.9rem;
+    font-weight: 700;
+    margin-top: 0.3rem;
+}
+
+.kpi-caption {
+    margin-top: 0.45rem;
+    color: #cbd5e1;
+    font-size: 0.88rem;
+}
+
+.section-note {
+    padding: 0.9rem 1rem;
+    border-left: 4px solid #f59e0b;
+    background: rgba(245, 158, 11, 0.12);
+    border-radius: 14px;
+    color: #f8fafc;
+    margin-bottom: 1rem;
+}
+
+[data-testid="stTabs"] button {
+    color: #cbd5e1;
+}
+
+[data-testid="stTabs"] [aria-selected="true"] {
+    color: #f8fafc;
+}
+
+[data-testid="stDataFrame"] {
+    border: 1px solid rgba(148, 163, 184, 0.12);
+    border-radius: 14px;
+}
+
+.section-shell {
+    border: 1px solid rgba(148, 163, 184, 0.12);
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.72), rgba(15, 23, 42, 0.5));
+    box-shadow: 0 18px 30px rgba(2, 6, 23, 0.18);
+    border-radius: 24px;
+    padding: 1.2rem 1.3rem;
+    margin: 0.4rem 0 1rem 0;
+}
+
+.section-eyebrow {
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    font-size: 0.72rem;
+    color: #7dd3fc;
+    margin-bottom: 0.45rem;
+}
+
+.section-title {
+    font-size: 1.45rem;
+    font-weight: 700;
+    color: #f8fafc;
+    margin-bottom: 0.25rem;
+}
+
+.section-copy {
+    color: #cbd5e1;
+    font-size: 0.95rem;
+    line-height: 1.55;
+}
+
+.mini-stat-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.7rem;
+    margin-top: 0.8rem;
+}
+
+.mini-stat {
+    border-radius: 16px;
+    padding: 0.8rem 0.9rem;
+    background: rgba(30, 41, 59, 0.78);
+    border: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.mini-stat-label {
+    font-size: 0.76rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #93c5fd;
+}
+
+.mini-stat-value {
+    margin-top: 0.25rem;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #f8fafc;
+}
+
+.callout-card {
+    border-radius: 18px;
+    padding: 1rem 1.05rem;
+    background: linear-gradient(135deg, rgba(37, 99, 235, 0.16), rgba(14, 165, 233, 0.08));
+    border: 1px solid rgba(96, 165, 250, 0.18);
+    margin-bottom: 0.9rem;
+}
+
+.callout-title {
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: #7dd3fc;
+}
+
+.callout-body {
+    margin-top: 0.35rem;
+    font-size: 1rem;
+    color: #e2e8f0;
+    line-height: 1.55;
+}
+
+@media (max-width: 900px) {
+    .block-container {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+
+    .hero-title {
+        font-size: 1.7rem;
+    }
+
+    .section-title {
+        font-size: 1.2rem;
+    }
+
+    .kpi-value {
+        font-size: 1.5rem;
+    }
+}

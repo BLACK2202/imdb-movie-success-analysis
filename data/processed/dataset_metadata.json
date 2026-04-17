@@ -1,0 +1,22 @@
+{
+  "rows": 598680,
+  "columns": [
+    "tconst",
+    "titleType",
+    "primaryTitle",
+    "originalTitle",
+    "isAdult",
+    "startYear",
+    "runtimeMinutes",
+    "genres",
+    "averageRating",
+    "numVotes",
+    "logVotes",
+    "success_score",
+    "decade",
+    "mainGenre",
+    "ratingBucket",
+    "voteBucket"
+  ],
+  "path": "D:\\University\\Medtech\\4th Year\\Semester 2\\CS434 - Data Analytics\\Project\\Data 3\\imdb-movie-success-analysis-upgraded\\data\\processed\\imdb_prepared.parquet"
+}
